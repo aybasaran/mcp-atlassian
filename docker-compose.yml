@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  mcp-atlassian:
+    image: ghcr.io/sooperset/mcp-atlassian:latest
+    environment:
+      - PORT=${PORT}
+      - READ_ONLY_MODE=true
+      - TRANSPORT=sse
+      - CONFLUENCE_URL=${CONFLUENCE_URL}
+      - CONFLUENCE_USERNAME=${CONFLUENCE_USERNAME}
+      - CONFLUENCE_API_TOKEN=${CONFLUENCE_API_TOKEN}
+      - JIRA_URL=${JIRA_URL}
+      - JIRA_USERNAME=${JIRA_USERNAME}
+      - JIRA_API_TOKEN=${JIRA_API_TOKEN}
+    ports:
+      - "${PORT}:${PORT}"
+    restart: unless-stopped
