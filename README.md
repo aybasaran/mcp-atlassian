@@ -40,19 +40,51 @@ https://github.com/user-attachments/assets/7fe9c488-ad0c-4876-9b54-120b666bb785
 
 ### 1. Authentication Setup
 
-First, generate the necessary authentication tokens for Confluence & Jira:
+MCP Atlassian supports three authentication methods:
 
-#### For Cloud
+#### A. API Token Authentication (Cloud)
 
 1. Go to https://id.atlassian.com/manage-profile/security/api-tokens
 2. Click **Create API token**, name it
 3. Copy the token immediately
 
-#### For Server/Data Center
+#### B. Personal Access Token (Server/Data Center)
 
 1. Go to your profile (avatar) → **Profile** → **Personal Access Tokens**
 2. Click **Create token**, name it, set expiry
 3. Copy the token immediately
+
+#### C. OAuth 2.0 Authentication (Cloud only)
+
+1. Create an OAuth 2.0 integration in Atlassian:
+   - Go to https://developer.atlassian.com/console/myapps/
+   - Click "Create" and select "OAuth 2.0 integration"
+   - Follow the wizard to create your app
+   - Configure permissions for both Jira and Confluence as needed
+   - Add a callback URL (e.g., http://localhost:8080/callback)
+
+2. Run the OAuth authorization helper:
+   ```bash
+   uvx mcp-atlassian@latest --oauth-setup
+   ```
+   This will guide you through the setup process by prompting for the required values (Client ID, Client Secret, etc.).
+
+   Alternatively, you can clone the repository and run the script directly:
+   ```bash
+   # Clone the repository if you haven't already
+   git clone https://github.com/sooperset/mcp-atlassian.git
+   cd mcp-atlassian
+
+   # Run the OAuth authorization script
+   python scripts/oauth_authorize.py \
+     --client-id YOUR_CLIENT_ID \
+     --client-secret YOUR_CLIENT_SECRET \
+     --redirect-uri "http://localhost:8080/callback" \
+     --scope "read:jira-work write:jira-work read:confluence-space.summary write:confluence-content"
+   ```
+
+3. Follow the browser prompt to authorize the application
+4. After successful authorization, add the displayed environment variables to your .env file
 
 ### 2. Installation
 
@@ -68,16 +100,12 @@ docker pull ghcr.io/sooperset/mcp-atlassian:latest
 MCP Atlassian is designed to be used with AI assistants through IDE integration.
 
 > [!TIP]
-> **To apply the configuration in Claude Desktop:**
->
-> **Method 1 (Recommended)**: Click hamburger menu (☰) > Settings > Developer > "Edit Config" button
->
-> **Method 2**: Locate and edit the configuration file directly:
+> **For Claude Desktop**: Locate and edit the configuration file directly:
 > - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 > - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 > - **Linux**: `~/.config/Claude/claude_desktop_config.json`
 >
-> **For Cursor**: Open Settings → Features → MCP Servers → + Add new global MCP server
+> **For Cursor**: Open Settings → MCP → + Add new global MCP server
 
 ### Configuration Methods
 
@@ -189,6 +217,90 @@ For Server/Data Center deployments, use direct variable passing:
 
 > [!NOTE]
 > Set `CONFLUENCE_SSL_VERIFY` and `JIRA_SSL_VERIFY` to "false" only if you have self-signed certificates.
+
+</details>
+
+<details>
+<summary>OAuth 2.0 Authentication Configuration</summary>
+
+For Atlassian Cloud with OAuth 2.0:
+
+```json
+{
+  "mcpServers": {
+    "mcp-atlassian": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "-e", "CONFLUENCE_URL",
+        "-e", "JIRA_URL",
+        "-e", "ATLASSIAN_OAUTH_CLIENT_ID",
+        "-e", "ATLASSIAN_OAUTH_CLIENT_SECRET",
+        "-e", "ATLASSIAN_OAUTH_REDIRECT_URI",
+        "-e", "ATLASSIAN_OAUTH_SCOPE",
+        "-e", "ATLASSIAN_OAUTH_CLOUD_ID",
+        "ghcr.io/sooperset/mcp-atlassian:latest"
+      ],
+      "env": {
+        "CONFLUENCE_URL": "https://your-company.atlassian.net/wiki",
+        "JIRA_URL": "https://your-company.atlassian.net",
+        "ATLASSIAN_OAUTH_CLIENT_ID": "your_client_id",
+        "ATLASSIAN_OAUTH_CLIENT_SECRET": "your_client_secret",
+        "ATLASSIAN_OAUTH_REDIRECT_URI": "http://localhost:8080/callback",
+        "ATLASSIAN_OAUTH_SCOPE": "read:jira-work write:jira-work read:confluence-space.summary write:confluence-content",
+        "ATLASSIAN_OAUTH_CLOUD_ID": "your_cloud_id"
+      }
+    }
+  }
+}
+```
+
+> [!TIP]
+> Run the `scripts/oauth_authorize.py` script to get your access token and cloud ID.
+> OAuth 2.0 authentication takes precedence over other authentication methods if configured.
+
+</details>
+
+<details>
+<summary>Proxy Configuration</summary>
+
+MCP Atlassian supports routing API requests through standard HTTP/HTTPS/SOCKS proxies. Configure using environment variables:
+
+- Supports standard `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `SOCKS_PROXY`.
+- Service-specific overrides are available (e.g., `JIRA_HTTPS_PROXY`, `CONFLUENCE_NO_PROXY`).
+- Service-specific variables override global ones for that service.
+
+Add the relevant proxy variables to the `args` (using `-e`) and `env` sections of your MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "mcp-atlassian": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e", "... existing Confluence/Jira vars",
+        "-e", "HTTP_PROXY",
+        "-e", "HTTPS_PROXY",
+        "-e", "NO_PROXY",
+        "ghcr.io/sooperset/mcp-atlassian:latest"
+      ],
+      "env": {
+        "... existing Confluence/Jira vars": "...",
+        "HTTP_PROXY": "http://proxy.internal:8080",
+        "HTTPS_PROXY": "http://proxy.internal:8080",
+        "NO_PROXY": "localhost,.your-company.com"
+      }
+    }
+  }
+}
+```
+
+Credentials in proxy URLs are masked in logs. If you set `NO_PROXY`, it will be respected for requests to matching hosts.
 
 </details>
 
@@ -320,6 +432,7 @@ For Jira Server/DC, use:
     ```
 </details>
 
+
 ## Tools
 
 ### Key Tools
@@ -349,7 +462,6 @@ For Jira Server/DC, use:
 |`confluence_search`|`jira_get_issue`|
 |`confluence_get_page`|`jira_search`|
 |`confluence_get_page_children`|`jira_get_project_issues`|
-|`confluence_get_page_ancestors`|`jira_get_epic_issues`|
 |`confluence_get_comments`|`jira_create_issue`|
 |`confluence_create_page`|`jira_batch_create_issues`|
 |`confluence_update_page`|`jira_update_issue`|

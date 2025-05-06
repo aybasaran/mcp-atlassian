@@ -2,6 +2,48 @@
 
 ## [Unreleased]
 
+
+## [0.10.3] - 2025-05-06
+
+### Added
+- **Proxy Support:** Added support for HTTP/S and SOCKS proxies. Configure globally using `HTTP_PROXY`, `HTTPS_PROXY`, `SOCKS_PROXY`, `NO_PROXY` environment variables, or use service-specific overrides like `JIRA_HTTPS_PROXY`, `CONFLUENCE_NO_PROXY`. (#260, #361)
+
+### Fixed
+- Fixed `Context is not available outside of a request` error occurring when running via `uvx` due to incompatibility with `fastmcp>=2.2.8`. Pinned `fastmcp` dependency to `<2.2.8` to ensure compatibility with the latest `mcp-atlassian` release when installed via `uvx`. (#383)
+
+## [0.10.2] - 2025-05-06
+
+### Fixed
+- SSE server now binds to "0.0.0.0" for broader network access.
+
+## [0.10.1] - 2025-05-05
+
+### Fixed
+- Re-added the `/healthz` endpoint for Kubernetes health probes, which was accidentally removed during the FastMCP v2 migration (#371). This restores the fix for #359.
+
+## [0.10.0] - 2025-05-05
+
+### Added
+-   **OAuth 2.0 Authentication:** Added support for OAuth 2.0 (3LO) for Jira and Confluence Cloud, including an interactive `--oauth-setup` wizard for easier configuration. Uses `keyring` for secure token storage. (Fixes #238)
+-   **Health Check Endpoint:** Introduced a `/healthz` endpoint for Kubernetes readiness/liveness probes when using the SSE transport mode. (Fixes #359)
+
+### Changed
+-   **Server Framework:** Migrated the core server implementation from the legacy `mcp` library to the modern `fastmcp>=2.2.5` framework. This includes a new server structure under `src/mcp_atlassian/servers/` and centralized context management. (Fixes #371)
+-   **Jira Cloud Search Limit:** Updated Jira Cloud search to use `enhanced_jql_get_list_of_tickets`, allowing retrieval of more than the previous 50-issue limit per request. (Fixes #369)
+-   **Docker:** Optimized Docker image build process for smaller size (using Alpine base images) and improved security (running as non-root user).
+
+### Fixed
+-   **Jira Cloud Search Count:** Corrected the `total` count reported in `jira_search` results for Jira Cloud instances, which was previously limited by the pagination size. (Refs #333)
+
+### Removed
+-   **Tools:** Removed the `jira_get_epic_issues` and `confluence_get_page_ancestors` tools. Their functionality can be achieved using the respective `search` tools with appropriate JQL/CQL queries. (Fixes #372)
+
+### Internal
+-   **Configuration:** Consolidated `ruff` and `mypy` configurations into `pyproject.toml`, removing legacy config files.
+
+### Documentation
+-   Simplified setup and usage instructions in the README, adding guidance for the new OAuth setup command (`uvx mcp-atlassian --oauth-setup`).
+
 ## [0.9.0] - 2025-05-01
 
 ### Added
@@ -17,8 +59,6 @@
 ### Fixed
 - Fixed labels not being correctly applied during Jira issue creation with improved field handling (#357)
 - Fixed Jira Cloud searches by using `enhanced_jql` for Cloud and fixing startAt TypeErrors in pagination (#356)
-- Fixed SSL verification environment variables being respected in Docker environment (#340)
-- Corrected jira_update_issue example for assignee format (#339)
 
 ## [0.8.4] - 2025-04-26
 

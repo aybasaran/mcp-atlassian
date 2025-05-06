@@ -1,11 +1,16 @@
 """Base client module for Jira API interactions."""
 
 import logging
+import os
 from typing import Any, Literal
 
 from atlassian import Jira
+from requests import Session
 
+from mcp_atlassian.exceptions import MCPAtlassianAuthenticationError
 from mcp_atlassian.preprocessing import JiraPreprocessor
+from mcp_atlassian.utils.logging import log_config_param
+from mcp_atlassian.utils.oauth import configure_oauth_session
 from mcp_atlassian.utils.ssl import configure_ssl_verification
 
 from .config import JiraConfig
@@ -31,12 +36,38 @@ class JiraClient:
 
         Raises:
             ValueError: If configuration is invalid or required credentials are missing
+            MCPAtlassianAuthenticationError: If OAuth authentication fails
         """
         # Load configuration from environment variables if not provided
         self.config = config or JiraConfig.from_env()
 
         # Initialize the Jira client based on auth type
-        if self.config.auth_type == "token":
+        if self.config.auth_type == "oauth":
+            if not self.config.oauth_config or not self.config.oauth_config.cloud_id:
+                error_msg = "OAuth authentication requires a valid cloud_id"
+                raise ValueError(error_msg)
+
+            # Create a session for OAuth
+            session = Session()
+
+            # Configure the session with OAuth authentication
+            if not configure_oauth_session(session, self.config.oauth_config):
+                error_msg = "Failed to configure OAuth session"
+                raise MCPAtlassianAuthenticationError(error_msg)
+
+            # The Jira API URL with OAuth is different
+            api_url = (
+                f"https://api.atlassian.com/ex/jira/{self.config.oauth_config.cloud_id}"
+            )
+
+            # Initialize Jira with the session
+            self.jira = Jira(
+                url=api_url,
+                session=session,
+                cloud=True,  # OAuth is only for Cloud
+                verify_ssl=self.config.ssl_verify,
+            )
+        elif self.config.auth_type == "token":
             self.jira = Jira(
                 url=self.config.url,
                 token=self.config.personal_token,
@@ -59,6 +90,24 @@ class JiraClient:
             session=self.jira._session,
             ssl_verify=self.config.ssl_verify,
         )
+
+        # Proxy configuration
+        proxies = {}
+        if self.config.http_proxy:
+            proxies["http"] = self.config.http_proxy
+        if self.config.https_proxy:
+            proxies["https"] = self.config.https_proxy
+        if self.config.socks_proxy:
+            proxies["socks"] = self.config.socks_proxy
+        if proxies:
+            self.jira._session.proxies.update(proxies)
+            for k, v in proxies.items():
+                log_config_param(
+                    logger, "Jira", f"{k.upper()}_PROXY", v, sensitive=True
+                )
+        if self.config.no_proxy and isinstance(self.config.no_proxy, str):
+            os.environ["NO_PROXY"] = self.config.no_proxy
+            log_config_param(logger, "Jira", "NO_PROXY", self.config.no_proxy)
 
         # Initialize the text preprocessor for text processing capabilities
         self.preprocessor = JiraPreprocessor(base_url=self.config.url)
