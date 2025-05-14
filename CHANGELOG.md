@@ -2,6 +2,41 @@
 
 ## [Unreleased]
 
+## [0.10.6] - 2025-05-12
+
+### Fixed
+- Enhanced OAuth configuration detection to properly identify and prioritize OAuth 2.0 setup when all required variables are present, especially verifying ATLASSIAN_OAUTH_CLOUD_ID (#410)
+- Improved OAuth 2.0 authentication method selection logic in environment configuration handling (#412)
+
+### Documentation
+- Restored and enhanced OAuth 2.0 (3LO) setup guide in README.md with clear step-by-step instructions (#411, #414)
+- Added Docker-specific OAuth configuration examples, including token persistence via volume mounting (#413)
+- Reorganized authentication methods in .env.example for improved clarity and user understanding (#414)
+- Added expanded IDE integration examples for OAuth 2.0 configuration (#415)
+
+## [0.10.5] - 2025-05-10
+
+### Fixed
+- Enhanced compatibility with various MCP clients by improving optional parameter handling in Jira and Confluence tools (#389, #407)
+- Fixed type errors with FastMCP v2.3.1 by updating Context type hints (#408)
+
+### Changed
+- Updated dependencies to use FastMCP 2.3.x series
+
+## [0.10.4] - 2025-05-10
+
+### Added
+- New `jira_get_user_profile` tool to fetch user information using various identifiers (#396)
+- Added `offline_access` scope to OAuth configs to enable refresh tokens and prevent authentication failures (#381)
+
+### Fixed
+- Made optional string parameters in Confluence tools handle `None` values properly for better client compatibility (#389)
+- Fixed OAuth callback errors and improved logging for easier troubleshooting (#402)
+
+### Documentation
+- Temporarily removed OAuth setup instructions pending validation in Docker environments (#404)
+- Clarified Jira tool parameter descriptions, especially for the `assignee` field (#391, #395)
+- Added security guidance for client secret handling in OAuth setup (#381)
 
 ## [0.10.3] - 2025-05-06
 

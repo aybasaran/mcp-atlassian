@@ -2,12 +2,12 @@
 
 import json
 import logging
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastmcp import Context, FastMCP
 from pydantic import Field
 
-from .context import MainAppContext
+from ..utils import convert_empty_defaults_to_none
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +17,10 @@ confluence_mcp = FastMCP(
 )
 
 
+@convert_empty_defaults_to_none
 @confluence_mcp.tool(tags={"confluence", "read"})
 async def search(
-    ctx: Context[Any, MainAppContext],
+    ctx: Context,
     query: Annotated[
         str,
         Field(
@@ -55,14 +56,15 @@ async def search(
         ),
     ] = 10,
     spaces_filter: Annotated[
-        str | None,
+        str,
         Field(
             description=(
-                "Comma-separated list of space keys to filter results by. "
+                "(Optional) Comma-separated list of space keys to filter results by. "
                 "Overrides the environment variable CONFLUENCE_SPACES_FILTER if provided."
             ),
+            default="",
         ),
-    ] = None,
+    ] = "",
 ) -> str:
     """Search Confluence content using simple terms or CQL.
 
@@ -105,7 +107,7 @@ async def search(
 
 @confluence_mcp.tool(tags={"confluence", "read"})
 async def get_page(
-    ctx: Context[Any, MainAppContext],
+    ctx: Context,
     page_id: Annotated[
         str,
         Field(
@@ -163,7 +165,7 @@ async def get_page(
 
 @confluence_mcp.tool(tags={"confluence", "read"})
 async def get_page_children(
-    ctx: Context[Any, MainAppContext],
+    ctx: Context,
     parent_id: Annotated[
         str,
         Field(
@@ -255,7 +257,7 @@ async def get_page_children(
 
 @confluence_mcp.tool(tags={"confluence", "read"})
 async def get_comments(
-    ctx: Context[Any, MainAppContext],
+    ctx: Context,
     page_id: Annotated[
         str,
         Field(
@@ -288,7 +290,7 @@ async def get_comments(
 
 @confluence_mcp.tool(tags={"confluence", "read"})
 async def get_labels(
-    ctx: Context[Any, MainAppContext],
+    ctx: Context,
     page_id: Annotated[
         str,
         Field(
@@ -321,7 +323,7 @@ async def get_labels(
 
 @confluence_mcp.tool(tags={"confluence", "write"})
 async def add_label(
-    ctx: Context[Any, MainAppContext],
+    ctx: Context,
     page_id: Annotated[str, Field(description="The ID of the page to update")],
     name: Annotated[str, Field(description="The name of the label")],
 ) -> str:
@@ -351,9 +353,10 @@ async def add_label(
     return json.dumps(formatted_labels, indent=2, ensure_ascii=False)
 
 
+@convert_empty_defaults_to_none
 @confluence_mcp.tool(tags={"confluence", "write"})
 async def create_page(
-    ctx: Context[Any, MainAppContext],
+    ctx: Context,
     space_key: Annotated[
         str,
         Field(
@@ -368,11 +371,12 @@ async def create_page(
         ),
     ],
     parent_id: Annotated[
-        str | None,
+        str,
         Field(
-            description="Optional parent page ID. If provided, this page will be created as a child of the specified page"
+            description="(Optional) parent page ID. If provided, this page will be created as a child of the specified page",
+            default="",
         ),
-    ] = None,
+    ] = "",
 ) -> str:
     """Create a new Confluence page.
 
@@ -414,7 +418,7 @@ async def create_page(
 
 @confluence_mcp.tool(tags={"confluence", "write"})
 async def update_page(
-    ctx: Context[Any, MainAppContext],
+    ctx: Context,
     page_id: Annotated[str, Field(description="The ID of the page to update")],
     title: Annotated[str, Field(description="The new title of the page")],
     content: Annotated[
@@ -427,8 +431,9 @@ async def update_page(
         str, Field(description="Optional comment for this version", default="")
     ] = "",
     parent_id: Annotated[
-        str | None, Field(description="Optional the new parent page ID")
-    ] = None,
+        str,  # TODO: Revert type hint to once Cursor IDE handles optional parameters with Union types correctly.
+        Field(description="Optional the new parent page ID", default=""),
+    ] = "",
 ) -> str:
     """Update an existing Confluence page.
 
@@ -455,6 +460,9 @@ async def update_page(
         raise ValueError("Confluence client is not configured or available.")
     confluence = lifespan_ctx.confluence
 
+    # TODO: revert this once Cursor IDE handles optional parameters with Union types correctly.
+    actual_parent_id = parent_id if parent_id else None
+
     updated_page = confluence.update_page(
         page_id=page_id,
         title=title,
@@ -462,7 +470,7 @@ async def update_page(
         is_minor_edit=is_minor_edit,
         version_comment=version_comment,
         is_markdown=True,
-        parent_id=parent_id,
+        parent_id=actual_parent_id,
     )
     page_data = updated_page.to_simplified_dict()
     return json.dumps(
@@ -474,7 +482,7 @@ async def update_page(
 
 @confluence_mcp.tool(tags={"confluence", "write"})
 async def delete_page(
-    ctx: Context[Any, MainAppContext],
+    ctx: Context,
     page_id: Annotated[str, Field(description="The ID of the page to delete")],
 ) -> str:
     """Delete an existing Confluence page.
